@@ -1,2 +1,2 @@
-Simple AI-agent that uses telegram-bot with timed reminders to document progress. Will be connected to LLM later for summarizing data.
+Simple functionality for telegram-bot to document progression and recieve notifications as planned. Will be connected to LLM later for summarizing data.
 Requires aiogram-framework to work. https://aiogram.dev
