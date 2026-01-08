@@ -12,8 +12,8 @@ class Config:
     db_path: str
 
 def load_config() -> Config:
-    bot_token = os.getenv("BOT_TOKEN", "8599207666:AAGxh74fm1xMqqieEoAqg5QQ7LXzVk3543A").strip()
-    owner_id = int(os.getenv("OWNER_TELEGRAM_ID", "OWNER_TELEGRAM_ID=695757005").strip())
+    bot_token = os.getenv("BOT_TOKEN", "").strip()
+    owner_id = int(os.getenv("OWNER_TELEGRAM_ID", "OWNER_TELEGRAM_ID=").strip())
     tz = os.getenv("TZ", "Europe/Helsinki").strip()
     db_path = os.getenv("DB_PATH", "data/app.db").strip()
 
