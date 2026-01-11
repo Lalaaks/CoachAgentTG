@@ -1,55 +1,54 @@
-from aiogram import Router, F
-from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery
+from __future__ import annotations
 
-from app.utils import week_start_utc_iso
+from datetime import datetime, timedelta, timezone
+
+from aiogram import Router
+from aiogram.filters import Command
+from aiogram.types import Message
 
 router = Router()
 
+
+def _iso_utc(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat()
+
+
 @router.message(Command("stats"))
 async def cmd_stats(message: Message, db, config):
+    # Owner-only (sama tyyli kuin study.py)
     if message.from_user.id != config.owner_telegram_id:
-        return
-    settings = await db.get_settings(message.from_user.id)
-    since = week_start_utc_iso(settings.get("timezone", config.tz))
-    s = await db.get_week_stats(message.from_user.id, since)
+        return await message.answer("Tämä botti on rajattu omistajalle.")
 
-    base = s["base"]
-    top_topics = s["top_topics"]
-    top_stuck = s["top_stuck"]
+    user_id = message.from_user.id
 
-    lines = [
-        "📊 Tämä viikko",
-        f"• Sessioita: {base['sessions']}",
-        f"• Minuutteja: {base['minutes']}",
-        "",
-        "🏷️ Top-aiheet:",
-    ]
-    if top_topics:
-        for t in top_topics:
-            lines.append(f"• {t['topic']}: {t['minutes']} min")
+    # Viimeiset 7 päivää (UTC, riittää MVP:hen)
+    now = datetime.now(timezone.utc)
+    since_7d = _iso_utc(now - timedelta(days=7))
+
+    sessions_7d, minutes_7d = await db.sum_completed_minutes_since(user_id, since_7d)
+
+    # Bonus: jos aktiivinen sessio käynnissä
+    active = await db.get_active_study_session(user_id)
+
+    text = "📈 STUDY STATS\n\n"
+    text += f"🗓️ Viimeiset 7 päivää:\n"
+    text += f"• Sessioita: {sessions_7d}\n"
+    text += f"• Minuutteja: {minutes_7d}\n"
+
+    if sessions_7d > 0:
+        avg = minutes_7d / sessions_7d
+        text += f"• Keskiarvo: {avg:.1f} min / sessio\n"
+
+    text += "\n"
+
+    if active:
+        text += "⏳ Aktiivinen sessio:\n"
+        text += f"• Aihe: {active.get('topic')}\n"
+        text += f"• Tavoite: {active.get('goal')}\n"
+        text += f"• Suunniteltu: {active.get('planned_minutes')} min\n"
+        text += "Lopeta: /end\n"
     else:
-        lines.append("• (ei vielä dataa)")
+        text += "✅ Ei aktiivista sessiota.\n"
+        text += "Aloita uusi: /study\n"
 
-    lines.append("")
-    lines.append("🧩 Top-jumit:")
-    if top_stuck:
-        for j in top_stuck:
-            lines.append(f"• {j['stuck_point']}: {j['cnt']}x")
-    else:
-        lines.append("• (ei vielä dataa)")
-
-    await message.answer("\n".join(lines))
-
-@router.callback_query(F.data == "stats:week")
-async def cb_stats(call: CallbackQuery, db, config):
-    # ohjaa samaan kuin /stats
-    msg = call.message
-    # luodaan "fake" Message-käsittely: kutsutaan suoraan logiikkaa
-    settings = await db.get_settings(call.from_user.id)
-    since = week_start_utc_iso(settings.get("timezone", config.tz))
-    s = await db.get_week_stats(call.from_user.id, since)
-    base = s["base"]
-
-    await msg.answer(f"📊 Tämä viikko: {base['sessions']} sessiota, {base['minutes']} min.\n\nKatso lisää: /stats")
-    await call.answer()
+    await message.answer(text)

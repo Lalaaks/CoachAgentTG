@@ -19,9 +19,9 @@ async def cmd_study(message: Message, state: FSMContext, db, config):
     active = await db.get_active_study_session(message.from_user.id)
     if active:
         return await message.answer(
-            f"Sinulla on jo aktiivinen sessio:\n"
+            f"Edellinen homma oli kesken:\n"
             f"• Aihe: {active.get('topic')}\n"
-            f"• Tavoite: {active.get('goal')}\n\n"
+            f"• Tavoite: {active.get('goal')}\n"
             f"Lopeta: /end"
         )
 
@@ -96,7 +96,7 @@ async def end_what_done(message: Message, state: FSMContext, config):
         return
     await state.update_data(what_done=message.text.strip())
     await state.set_state(StudyFlow.end_stuck)
-    await message.answer("🧩 Mihin jäit jumiin? (tai kirjoita: ei)")
+    await message.answer("🧩 Mitä haasteita kohtasit tänään?")
 
 @router.message(StudyFlow.end_stuck)
 async def end_stuck(message: Message, state: FSMContext, config):

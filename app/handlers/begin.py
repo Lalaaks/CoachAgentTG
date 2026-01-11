@@ -9,8 +9,9 @@ router = Router()
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     await message.answer(
-        "Koutsiagentti palveluksessanne. Mitä lähdetään kehittämään?\n\n"
-        "Aloita komennolla /study tai paina nappia.",
+        "ootsä vittu valmis \n\n"
+        "starttaa botti painamalla nappia(/study jos oot nörtti) \n\n"
+        "tai älä, vittuuks se mua liikuttaa ihan oikeesti on täs omatki hommat kesken",
         reply_markup=main_menu(),
     )
 
