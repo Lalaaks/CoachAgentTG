@@ -10,6 +10,6 @@ def main_menu_kb() -> InlineKeyboardMarkup:
     kb.button(text="Oppari: End", callback_data="opp:end")
     kb.button(text="Oppari: Status", callback_data="opp:status")
     kb.button(text="Agents", callback_data="admin:agents")
-    kb.button(text="Status", callback_data="admin:status")
+    kb.button(text="Status", callback_data="nav:status")
     kb.adjust(2, 2, 1)
     return kb.as_markup()

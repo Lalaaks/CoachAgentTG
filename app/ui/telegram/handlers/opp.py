@@ -15,7 +15,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
-from app.agents.OppariAgentti import OppariAgent
+from app.domain.oppari.service import OppariService
+
 
 router = Router()
 

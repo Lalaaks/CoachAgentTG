@@ -26,9 +26,9 @@ async def help_cmd(message: Message):
         "/help\n"
         "/status\n"
         "/agents\n"
-        "/agent enable <id>\n"
-        "/agent disable <id>\n"
-        "/agent info <id>\n"
+        "/agent enable [id]\n"
+        "/agent disable [id]\n"
+        "/agent info [id]\n"
         "/opp_start /opp_end /opp_status\n"
         "/ping"
     )

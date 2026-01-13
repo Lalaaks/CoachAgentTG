@@ -4,8 +4,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.config import load_config
 from app.db.db import Database
-from app.handlers import begin, study, stats, settings, admin, help, status, reset, stats, agents, opp
-from app.handlers.opp import handle_opp
+from app.ui.telegram.handlers import begin, study, stats, settings, admin, help, status, reset, agents, opp, schedule
+from app.ui.telegram.handlers.tasks import router as tasks_router
+
 
 async def main():
     config = load_config()
@@ -15,13 +16,11 @@ async def main():
     db = Database(config.db_path)
     await db.init(config.owner_telegram_id, config.tz)
 
-    # Provide db & config to handlers via middleware-ish simple injection:
-    # aiogram v3 supports passing "kwargs" into handler via dp.update.outer_middleware,
-    # but simplest: use dp["db"]=db and dp["config"]=config, then request them as args.
     dp["db"] = db
     dp["config"] = config
+    dp["bot"] = bot  # hyödyllinen job-runnereille, jos haluat lähettää viestejä
 
-    # Include routers
+    # Routers
     dp.include_router(begin.router)
     dp.include_router(study.router)
     dp.include_router(settings.router)
@@ -32,9 +31,39 @@ async def main():
     dp.include_router(stats.router)
     dp.include_router(agents.router)
     dp.include_router(opp.router)
+    dp.include_router(schedule.router)
+    dp.include_router(tasks_router)
 
-    # Start polling
-    await dp.start_polling(bot, db=db, config=config)
+
+
+    # Scheduler
+    from app.infra.db.repo.scheduled_jobs_sqlite import ScheduledJobsRepo
+    from app.infra.scheduler.loop import SchedulerLoop, JobRunner
+
+    jobs_repo = ScheduledJobsRepo(db)
+    runner = JobRunner()
+
+    async def run_ping(job):
+        print("JOB RUN:", job.job_id, job.job_type, job.payload)
+        # myöhemmin esim:
+        # await bot.send_message(chat_id=job.user_id, text=f"Ping: {job.payload}")
+
+    runner.register("ping", run_ping)
+
+    scheduler = SchedulerLoop(repo=jobs_repo, runner=runner)
+    scheduler_task = asyncio.create_task(scheduler.run_forever())
+
+    try:
+        await dp.start_polling(bot)
+    finally:
+        # siisti alasajo
+        scheduler.stop()
+        scheduler_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await scheduler_task
+        await bot.session.close()
+
 
 if __name__ == "__main__":
+    import contextlib
     asyncio.run(main())
