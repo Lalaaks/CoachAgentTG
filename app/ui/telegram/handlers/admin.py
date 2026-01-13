@@ -165,7 +165,7 @@ async def agent_cmd(message: Message, db: Database, clock: SystemClock):
 
 
 # Callback hooks from main menu keyboard
-@router.callback_query()
+@router.callback_query(lambda c: (c.data or "").startswith("admin:"))
 async def admin_callbacks(cb: CallbackQuery, db: Database):
     data = cb.data or ""
     if data == "admin:agents":

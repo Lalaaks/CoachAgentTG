@@ -65,6 +65,143 @@ class ScheduledJobsRepo:
             ),
         )
 
+    import json
+
+# ... ScheduledJobsRepo class ...
+
+    async def create_todo(
+        self,
+        job_id: str,
+        user_id: int,
+        agent_id: str,
+        title: str,
+        chat_id: int,
+        due_at_iso_utc: str,
+        now_iso: str,
+    ) -> None:
+        payload = {"title": title, "chat_id": chat_id}
+        await self.create(
+            job_id=job_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            job_type="todo",
+            schedule_kind="once",
+            schedule={},
+            payload=payload,
+            due_at_iso_utc=due_at_iso_utc,
+            now_iso=now_iso,
+        )
+
+    async def list_pending_todos_for_user(self, user_id: int, limit: int = 5000):
+        rows = await self._db.fetchall(
+            """
+            SELECT *
+            FROM scheduled_jobs
+            WHERE user_id=? AND status='pending' AND job_type='todo'
+            ORDER BY due_at ASC, created_at ASC
+            LIMIT ?;
+            """,
+            (user_id, limit),
+        )
+        return [self._row_to_job(r) for r in rows]
+
+    async def cancel_top_todo_for_user(self, user_id: int, now_iso: str) -> bool:
+        row = await self._db.fetchone(
+            """
+            SELECT job_id
+            FROM scheduled_jobs
+            WHERE user_id=? AND status='pending' AND job_type='todo'
+            ORDER BY due_at ASC, created_at ASC
+            LIMIT 1;
+            """,
+            (user_id,),
+        )
+        if not row:
+            return False
+
+        job_id = row["job_id"]
+        await self._db.execute(
+            """
+            UPDATE scheduled_jobs
+            SET status='cancelled',
+                updated_at=?
+            WHERE job_id=? AND user_id=?;
+            """,
+            (now_iso, job_id, user_id),
+        )
+        return True
+
+    async def cancel_all_todos_for_user(self, user_id: int, now_iso: str) -> int:
+        row = await self._db.fetchone(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM scheduled_jobs
+            WHERE user_id=? AND status='pending' AND job_type='todo';
+            """,
+            (user_id,),
+        )
+        cnt = int(row["cnt"]) if row else 0
+
+        await self._db.execute(
+            """
+            UPDATE scheduled_jobs
+            SET status='cancelled',
+                updated_at=?
+            WHERE user_id=? AND status='pending' AND job_type='todo';
+            """,
+            (now_iso, user_id),
+        )
+        return cnt
+
+    async def mark_done_for_user(self, job_id: str, user_id: int, now_iso: str) -> bool:
+        row = await self._db.fetchone(
+            """
+            SELECT job_id
+            FROM scheduled_jobs
+            WHERE job_id=? AND user_id=? AND status='pending';
+            """,
+            (job_id, user_id),
+        )
+        if not row:
+            return False
+
+        await self._db.execute(
+            """
+            UPDATE scheduled_jobs
+            SET status='done',
+                completed_at=?,
+                updated_at=?
+            WHERE job_id=? AND user_id=?;
+            """,
+            (now_iso, now_iso, job_id, user_id),
+        )
+        return True
+
+    async def cancel_for_user(self, job_id: str, user_id: int, now_iso: str) -> bool:
+        row = await self._db.fetchone(
+            """
+            SELECT job_id
+            FROM scheduled_jobs
+            WHERE job_id=? AND user_id=? AND status='pending';
+            """,
+            (job_id, user_id),
+        )
+        if not row:
+            return False
+
+        await self._db.execute(
+            """
+            UPDATE scheduled_jobs
+            SET status='cancelled',
+                updated_at=?
+            WHERE job_id=? AND user_id=?;
+            """,
+            (now_iso, job_id, user_id),
+        )
+        return True
+
+
+
     async def get(self, job_id: str) -> Optional[ScheduledJob]:
         row = await self._db.fetchone("SELECT * FROM scheduled_jobs WHERE job_id = ?;", (job_id,))
         return self._row_to_job(row) if row else None
@@ -171,56 +308,3 @@ class ScheduledJobsRepo:
             last_error=row["last_error"],
             completed_at=row["completed_at"],
         )
-
-    async def mark_done_for_user(self, job_id: str, user_id: int, now_iso: str) -> bool:
-        """
-        Mark pending job as done (user action). Returns True if updated.
-        """
-        row = await self._db.fetchone(
-            """
-            SELECT job_id
-            FROM scheduled_jobs
-            WHERE job_id = ? AND user_id = ? AND status = 'pending';
-            """,
-            (job_id, user_id),
-        )
-        if not row:
-            return False
-
-        await self._db.execute(
-            """
-            UPDATE scheduled_jobs
-            SET status='done',
-                completed_at=?,
-                updated_at=?
-            WHERE job_id=? AND user_id=?;
-            """,
-            (now_iso, now_iso, job_id, user_id),
-        )
-        return True
-
-    async def cancel_for_user(self, job_id: str, user_id: int, now_iso: str) -> bool:
-        """
-        Cancel (delete) a pending job. Returns True if updated.
-        """
-        row = await self._db.fetchone(
-            """
-            SELECT job_id
-            FROM scheduled_jobs
-            WHERE job_id = ? AND user_id = ? AND status = 'pending';
-            """,
-            (job_id, user_id),
-        )
-        if not row:
-            return False
-
-        await self._db.execute(
-            """
-            UPDATE scheduled_jobs
-            SET status='cancelled',
-                updated_at=?
-            WHERE job_id=? AND user_id=?;
-            """,
-            (now_iso, job_id, user_id),
-        )
-        return True

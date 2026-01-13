@@ -9,13 +9,11 @@ END_PROMPT = (
 )
 
 ENTER_TIME_HINT = (
-    "Enter time as:\n"
-    "- HH:MM (today)\n"
-    "- YYYY-MM-DD HH:MM"
+    "Enter time as HHMM"
 )
 
-ASK_PLANNED_TASK = "What are you going to do? (planned task, short)"
-ASK_DESCRIPTION = "Describe what you did (short but clear)."
+ASK_PLANNED_TASK = "What are you going to do?"
+ASK_DESCRIPTION = "Describe what you did."
 ASK_LEARNED = "What did you learn? (optional, send '-' to skip)"
 ASK_CHALLENGES = "Challenges? (optional, send '-' to skip)"
 ASK_NEXT_STEPS = "Next steps? (optional, send '-' to skip)"

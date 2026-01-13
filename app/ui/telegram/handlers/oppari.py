@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from aiogram import Router
@@ -18,29 +18,30 @@ from app.ui.telegram import texts
 router = Router()
 
 
-def _parse_user_datetime(text: str, tz_name: str) -> datetime:
+def _parse_user_time(text: str, tz_name: str) -> datetime:
     """
     Accepts:
-      - HH:MM  (today)
-      - YYYY-MM-DD HH:MM
-      - YYYY-MM-DDTHH:MM
+      - HHMM   (e.g. 0730)
+      - HH:MM  (e.g. 07:30)
+    Returns datetime for *today* in user's timezone.
     """
     raw = (text or "").strip()
     tz = ZoneInfo(tz_name)
 
     # HH:MM
-    if len(raw) == 5 and raw[2] == ":":
-        hh = int(raw[:2])
-        mm = int(raw[3:])
+    if len(raw) == 5 and raw[2] == ":" and raw[:2].isdigit() and raw[3:].isdigit():
+        hh = int(raw[:2]); mm = int(raw[3:])
         now = datetime.now(tz)
         return now.replace(hour=hh, minute=mm, second=0, microsecond=0)
 
-    # try ISO / "YYYY-MM-DD HH:MM"
-    raw2 = raw.replace(" ", "T")
-    dt = datetime.fromisoformat(raw2)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=tz)
-    return dt
+    # HHMM
+    if len(raw) == 4 and raw.isdigit():
+        hh = int(raw[:2]); mm = int(raw[2:])
+        now = datetime.now(tz)
+        return now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+
+    raise ValueError("Invalid time format")
+
 
 
 @router.message(Command("opp_status"))
@@ -85,7 +86,7 @@ async def opp_start_enter_time(message: Message, state: FSMContext, timezone: st
         return
 
     try:
-        start_at = _parse_user_datetime(message.text, timezone)
+        start_at = _parse_user_time(message.text, timezone)
     except Exception:
         await message.answer("Invalid time format.\n" + texts.oppari.ENTER_TIME_HINT)
         return
@@ -157,6 +158,7 @@ async def opp_end_time_choice(cb: CallbackQuery, state: FSMContext, timezone: st
         return
 
 
+
 @router.message(OppariFlow.end_enter_time)
 async def opp_end_enter_time(message: Message, state: FSMContext, timezone: str):
     if (message.text or "").strip().lower() in ("/cancel", "cancel"):
@@ -165,7 +167,8 @@ async def opp_end_enter_time(message: Message, state: FSMContext, timezone: str)
         return
 
     try:
-        end_at = _parse_user_datetime(message.text, timezone)
+        end_at = _parse_user_time(message.text, timezone)
+        
     except Exception:
         await message.answer("Invalid time format.\n" + texts.oppari.ENTER_TIME_HINT)
         return
@@ -248,6 +251,39 @@ async def opp_end_not_completed_reason(message: Message, state: FSMContext):
     await state.update_data(not_completed_reason=txt)
     await state.set_state(OppariFlow.end_break_minutes)
     await message.answer(texts.oppari.ASK_BREAK_MINUTES, reply_markup=cancel_kb())
+
+# --- CALLBACKS FOR MAIN MENU BUTTONS (opp:start / opp:end / opp:status) ---
+
+@router.callback_query(lambda c: (c.data or "") == "opp:start")
+async def opp_start_cb(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await state.clear()
+    await state.set_state(OppariFlow.start_choose_time)
+    await cb.message.answer(texts.oppari.START_PROMPT, reply_markup=now_or_manual_kb("opp:start_time"))
+
+
+@router.callback_query(lambda c: (c.data or "") == "opp:end")
+async def opp_end_cb(cb: CallbackQuery, state: FSMContext, opp_service: OppariService):
+    await cb.answer()
+    await state.clear()
+
+    st = await opp_service.status(cb.from_user.id)
+    if not st.has_open_entry:
+        await cb.message.answer("No active Oppari session to end. Use Oppari: Start first.")
+        return
+
+    await state.set_state(OppariFlow.end_choose_time)
+    await cb.message.answer(texts.oppari.END_PROMPT, reply_markup=now_or_manual_kb("opp:end_time"))
+
+
+@router.callback_query(lambda c: (c.data or "") == "opp:status")
+async def opp_status_cb(cb: CallbackQuery, opp_service: OppariService):
+    await cb.answer()
+    st = await opp_service.status(cb.from_user.id)
+    if not st.has_open_entry:
+        await cb.message.answer("No active Oppari session.")
+        return
+    await cb.message.answer(f"Oppari running since: {st.open_entry.start_at.isoformat()}")
 
 
 @router.message(OppariFlow.end_break_minutes)

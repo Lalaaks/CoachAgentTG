@@ -23,6 +23,7 @@ from app.infra.db.schema_version import apply_migrations
 from app.infra.db.repo.oppari_sqlite import OppariSqliteRepo
 from app.infra.ids.uuid_gen import UuidGenerator
 
+from app.ui.telegram.handlers.cancel import router as cancel_router
 from app.ui.telegram.middlewares.auth import OwnerOnlyMiddleware
 from app.ui.telegram.middlewares.di import DIMiddleware
 from app.ui.telegram.handlers.admin import router as admin_router
@@ -82,6 +83,7 @@ async def main() -> None:
     dp.callback_query.middleware(DIMiddleware(opp_service, db=db, clock=clock, timezone=settings.timezone))
 
     # --- routers ---
+    dp.include_router(cancel_router)
     dp.include_router(admin_router)
     dp.include_router(oppari_router)
     dp.include_router(schedule_router)
