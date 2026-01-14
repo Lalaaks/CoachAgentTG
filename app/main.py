@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from app.config import load_config
-from app.db.db import Database
-from app.ui.telegram.handlers import begin, study, stats, settings, admin, help, status, reset, agents, opp, schedule
-from app.ui.telegram.handlers.tasks import router as tasks_router
+from app.infra.db.connection import Database
+from app.infra.db.schema_version import apply_migrations
+from app.domain.common.time import to_iso
 
+
+from app.config import load_settings
+from app.ui.telegram.handlers import admin, status, opp, schedule
+from app.ui.telegram.handlers.tasks import router as tasks_router
+from app.ui.telegram.main import main as telegram_main
 
 async def main():
-    config = load_config()
+    config = load_settings()
     bot = Bot(token=config.bot_token)
     dp = Dispatcher(storage=MemoryStorage())
 
@@ -21,15 +27,15 @@ async def main():
     dp["bot"] = bot  # hyödyllinen job-runnereille, jos haluat lähettää viestejä
 
     # Routers
-    dp.include_router(begin.router)
-    dp.include_router(study.router)
-    dp.include_router(settings.router)
+#    dp.include_router(begin.router)
+#    dp.include_router(study.router)
+#    dp.include_router(settings.router)
     dp.include_router(admin.router)
     dp.include_router(help.router)
     dp.include_router(status.router)
-    dp.include_router(reset.router)
-    dp.include_router(stats.router)
-    dp.include_router(agents.router)
+#    dp.include_router(reset.router)
+#    dp.include_router(stats.router)
+#    dp.include_router(agents.router)
     dp.include_router(opp.router)
     dp.include_router(schedule.router)
     dp.include_router(tasks_router)
@@ -64,6 +70,5 @@ async def main():
         await bot.session.close()
 
 
-if __name__ == "__main__":
-    import contextlib
-    asyncio.run(main())
+    if __name__ == "__main__":
+        asyncio.run(telegram_main())

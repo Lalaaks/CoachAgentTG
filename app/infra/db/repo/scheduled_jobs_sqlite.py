@@ -65,6 +65,109 @@ class ScheduledJobsRepo:
             ),
         )
 
+    async def create_todo(
+        self,
+        job_id: str,
+        user_id: int,
+        title: str,
+        chat_id: int,
+        now_iso: str,
+            ) -> None:
+        payload = {"title": title, "chat_id": chat_id}
+
+        await self._db.execute(
+            """
+            INSERT INTO scheduled_jobs(
+              job_id, user_id, agent_id,
+              job_type, schedule_kind, schedule_json, payload_json,
+              status, due_at, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', '9999-12-31T23:59:59Z', ?, ?);
+            """,
+            (
+                job_id,
+                user_id,
+                "todo",
+                "todo",
+                "manual",
+                None,
+                json.dumps(payload, ensure_ascii=False),
+                now_iso,
+                now_iso,
+            ),
+        )
+
+    async def list_pending_todos(self, user_id: int) -> list[dict[str, Any]]:
+        rows = await self._db.fetchall(
+            """
+            SELECT job_id, payload_json
+            FROM scheduled_jobs
+            WHERE user_id = ? AND job_type = 'todo' AND status = 'pending'
+            ORDER BY created_at ASC;
+            """,
+            (user_id,),
+        )
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            payload = json.loads(r["payload_json"] or "{}")
+            out.append({"job_id": r["job_id"], "title": payload.get("title", "")})
+        return out
+
+    async def mark_todo_done(self, job_id: str, user_id: int, now_iso: str) -> None:
+        await self._db.execute(
+            """
+            UPDATE scheduled_jobs
+            SET status='done', completed_at=?, updated_at=?
+            WHERE job_id=? AND user_id=? AND job_type='todo';
+            """,
+            (now_iso, now_iso, job_id, user_id),
+        )
+
+    async def delete_todo(self, job_id: str, user_id: int, now_iso: str) -> None:
+        await self._db.execute(
+            """
+            UPDATE scheduled_jobs
+            SET status='deleted', updated_at=?
+            WHERE job_id=? AND user_id=? AND job_type='todo';
+            """,
+            (now_iso, job_id, user_id),
+        )
+
+    async def update_todo_title(self, job_id: str, user_id: int, title: str, now_iso: str) -> None:
+        row = await self._db.fetchone(
+            """
+            SELECT payload_json
+            FROM scheduled_jobs
+            WHERE job_id=? AND user_id=? AND job_type='todo';
+            """,
+            (job_id, user_id),
+        )
+        payload = json.loads((row["payload_json"] if row else None) or "{}")
+        payload["title"] = title
+
+        await self._db.execute(
+            """
+            UPDATE scheduled_jobs
+            SET payload_json=?, updated_at=?
+            WHERE job_id=? AND user_id=? AND job_type='todo';
+            """,
+            (json.dumps(payload, ensure_ascii=False), now_iso, job_id, user_id),
+        )
+
+    async def get_todo_chat_id(self, job_id: str, user_id: int) -> Optional[int]:
+        row = await self._db.fetchone(
+            """
+            SELECT payload_json
+            FROM scheduled_jobs
+            WHERE job_id=? AND user_id=? AND job_type='todo';
+            """,
+            (job_id, user_id),
+        )
+        if not row:
+            return None
+        payload = json.loads(row["payload_json"] or "{}")
+        v = payload.get("chat_id")
+        return int(v) if v is not None else None
+
     import json
 
 # ... ScheduledJobsRepo class ...

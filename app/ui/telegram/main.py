@@ -29,6 +29,9 @@ from app.ui.telegram.middlewares.di import DIMiddleware
 from app.ui.telegram.handlers.admin import router as admin_router
 from app.ui.telegram.handlers.oppari import router as oppari_router
 from app.ui.telegram.handlers.schedule import router as schedule_router
+from app.ui.telegram.handlers.start import router as start_router
+from app.ui.telegram.handlers.mainmenu import router as mainmenu_router
+from app.ui.telegram.handlers.tasks import router as tasks_router
 
 from app.infra.db.repo.scheduled_jobs_sqlite import ScheduledJobsRepo
 from app.infra.scheduler.loop import SchedulerLoop, JobRunner
@@ -76,20 +79,30 @@ async def main() -> None:
     await opp_service.bootstrap()
 
     # --- middlewares ---
+    jobs_repo = ScheduledJobsRepo(db)
+
+
     dp.message.middleware(OwnerOnlyMiddleware(settings.owner_telegram_id))
     dp.callback_query.middleware(OwnerOnlyMiddleware(settings.owner_telegram_id))
 
-    dp.message.middleware(DIMiddleware(opp_service, db=db, clock=clock, timezone=settings.timezone))
-    dp.callback_query.middleware(DIMiddleware(opp_service, db=db, clock=clock, timezone=settings.timezone))
+    dp.message.middleware(DIMiddleware(opp_service, db, clock, settings.timezone, jobs_repo))
+    dp.callback_query.middleware(DIMiddleware(opp_service, db, clock, settings.timezone, jobs_repo))
 
     # --- routers ---
+    dp.include_router(start_router)
     dp.include_router(cancel_router)
-    dp.include_router(admin_router)
+    dp.include_router(mainmenu_router)
+    dp.include_router(tasks_router)
     dp.include_router(oppari_router)
+    dp.include_router(admin_router)
     dp.include_router(schedule_router)
 
     # --- scheduler (background) ---
     jobs_repo = ScheduledJobsRepo(db)
+    dp.message.middleware(DIMiddleware(opp_service, db, clock, settings.timezone, jobs_repo))
+    dp.callback_query.middleware(DIMiddleware(opp_service, db, clock, settings.timezone, jobs_repo))
+
+
     runner = JobRunner()
 
     async def run_ping(job):
