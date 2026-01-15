@@ -17,11 +17,7 @@ async def send_mainmenu(message: Message, text: str = "Menu") -> None:
 
 
 # --- Main menu button handlers (reply keyboard) ---
-
-@router.message(F.text == "Agentit")
-async def menu_agents(message: Message):
-    # placeholder / navigoi agenttimenuun myöhemmin
-    await send_mainmenu(message, "Agenttitoimisto tulossa.")
+# Note: "Agentit" button is handled by agents.py router
 
 
 @router.message(F.text == "Tilastot")

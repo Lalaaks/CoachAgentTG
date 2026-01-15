@@ -104,6 +104,28 @@ class ScheduledJobsRepo:
             out.append({"job_id": r["job_id"], "title": payload.get("title", "")})
         return out
 
+    async def list_completed_todos(self, user_id: int, limit: int = 50) -> list[dict[str, Any]]:
+        """List recently completed todos for analysis."""
+        rows = await self._db.fetchall(
+            """
+            SELECT job_id, payload_json, completed_at
+            FROM scheduled_jobs
+            WHERE user_id = ? AND job_type = 'todo' AND status = 'done'
+            ORDER BY completed_at DESC
+            LIMIT ?;
+            """,
+            (user_id, limit),
+        )
+        out: list[dict[str, Any]] = []
+        for r in rows:
+            payload = json.loads(r["payload_json"] or "{}")
+            out.append({
+                "job_id": r["job_id"],
+                "title": payload.get("title", ""),
+                "completed_at": r["completed_at"],
+            })
+        return out
+
     async def mark_todo_done(self, job_id: str, user_id: int, now_iso: str) -> None:
         await self._db.execute(
             """

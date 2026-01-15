@@ -15,6 +15,7 @@ class Settings:
     owner_telegram_id: int
     timezone: str
     db_path: Path
+    openai_api_key: str | None
 
 
 def load_settings() -> Settings:
@@ -22,6 +23,7 @@ def load_settings() -> Settings:
     owner_id = int(os.getenv("OWNER_TELEGRAM_ID", "0").strip())
     tz = os.getenv("TZ", "Europe/Helsinki").strip()
     db_raw = os.getenv("DB_PATH", "data/lifeops.db").strip()
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip() or None
 
     if not bot_token:
         raise RuntimeError("BOT_TOKEN missing in .env")
@@ -34,4 +36,5 @@ def load_settings() -> Settings:
         owner_telegram_id=owner_id,
         timezone=tz,
         db_path=Path(db_raw),
+        openai_api_key=openai_key,
     )

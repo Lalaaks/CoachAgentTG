@@ -16,6 +16,7 @@ from app.infra.db.connection import Database
 from app.infra.db.schema_version import apply_migrations
 from app.infra.db.repo.oppari_sqlite import OppariSqliteRepo
 from app.infra.ids.uuid_gen import UuidGenerator
+from app.infra.ai.openai_client import OpenAIClient
 
 from app.ui.telegram.middlewares.auth import OwnerOnlyMiddleware
 from app.ui.telegram.middlewares.di import DIMiddleware
@@ -30,6 +31,7 @@ from app.ui.telegram.handlers.start import router as start_router
 # ADD:
 from app.ui.telegram.handlers.stats import router as stats_router
 from app.ui.telegram.handlers.tasks import router as tasks_router
+from app.ui.telegram.handlers.agents import router as agents_router
 
 from app.infra.db.repo.scheduled_jobs_sqlite import ScheduledJobsRepo
 from app.infra.scheduler.loop import SchedulerLoop, JobRunner
@@ -68,6 +70,8 @@ async def main() -> None:
     oppari_service = OppariService(repo=oppari_repo, clock=clock, ids=ids)
     await oppari_service.bootstrap()
 
+    openai_client = OpenAIClient(settings.openai_api_key) if settings.openai_api_key else None
+
     bot = Bot(
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -78,8 +82,8 @@ async def main() -> None:
     dp.callback_query.middleware(OwnerOnlyMiddleware(settings.owner_telegram_id))
 
     jobs_repo = ScheduledJobsRepo(db)
-    dp.message.middleware(DIMiddleware(oppari_service, db=db, clock=clock, timezone=settings.tz, jobs_repo=jobs_repo))
-    dp.callback_query.middleware(DIMiddleware(oppari_service, db=db, clock=clock, timezone=settings.tz, jobs_repo=jobs_repo))
+    dp.message.middleware(DIMiddleware(oppari_service, db=db, clock=clock, timezone=settings.tz, jobs_repo=jobs_repo, openai_client=openai_client))
+    dp.callback_query.middleware(DIMiddleware(oppari_service, db=db, clock=clock, timezone=settings.tz, jobs_repo=jobs_repo, openai_client=openai_client))
 
     # Routers (start early, cancel early)
     dp.include_router(start_router)
@@ -90,6 +94,7 @@ async def main() -> None:
     # ADD:
     dp.include_router(tasks_router)
     dp.include_router(stats_router)
+    dp.include_router(agents_router)
 
     dp.include_router(oppari_router)
     dp.include_router(schedule_router)

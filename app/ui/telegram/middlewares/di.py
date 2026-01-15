@@ -9,6 +9,7 @@ from app.domain.oppari.service import OppariService
 from app.infra.clock.system_clock import SystemClock
 from app.infra.db.connection import Database
 from app.infra.db.repo.scheduled_jobs_sqlite import ScheduledJobsRepo
+from app.infra.ai.openai_client import OpenAIClient
 
 
 class DIMiddleware(BaseMiddleware):
@@ -16,7 +17,7 @@ class DIMiddleware(BaseMiddleware):
     Inject dependencies to handlers via `data` dict.
 
     Handlers can request args by name, e.g.
-      async def handler(message: Message, opp_service: OppariService, jobs_repo: ScheduledJobsRepo, clock: SystemClock): ...
+      async def handler(message: Message, opp_service: OppariService, jobs_repo: ScheduledJobsRepo, clock: SystemClock, openai_client: OpenAIClient | None): ...
     """
 
     def __init__(
@@ -26,12 +27,14 @@ class DIMiddleware(BaseMiddleware):
         clock: SystemClock,
         timezone: str,
         jobs_repo: ScheduledJobsRepo,
+        openai_client: OpenAIClient | None,
     ) -> None:
         self._opp = oppari_service
         self._db = db
         self._clock = clock
         self._tz = timezone
         self._jobs_repo = jobs_repo
+        self._openai_client = openai_client
 
     async def __call__(
         self,
@@ -45,5 +48,6 @@ class DIMiddleware(BaseMiddleware):
         data["clock"] = self._clock
         data["timezone"] = self._tz
         data["jobs_repo"] = self._jobs_repo
+        data["openai_client"] = self._openai_client
 
         return await handler(event, data)
