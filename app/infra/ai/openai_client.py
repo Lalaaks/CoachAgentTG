@@ -26,11 +26,9 @@ class OpenAIClient:
     ) -> str:
         """
         Analyze completed and pending tasks using OpenAI.
-
         Args:
             completed_tasks: List of completed tasks with 'title' field
             pending_tasks: List of pending tasks with 'title' field
-
         Returns:
             Analysis text in Finnish
         """
@@ -42,18 +40,14 @@ class OpenAIClient:
         pending_text = "\n".join(f"- {t.get('title', '')}" for t in pending_tasks) or "Ei tekemättömiä tehtäviä."
 
         prompt = f"""Analysoi käyttäjän tehtäviä ja anna lyhyt, ystävällinen tulkinta suomeksi.
-
 Tehdyt tehtävät:
 {completed_text}
-
 Tekemättömät tehtävät:
 {pending_text}
-
 Anna:
 1. Lyhyt yhteenveto työnkulusta (mitä on tehty, mitä jäänyt)
 2. Havaintoja työtapeista tai toistuvista teemoista
 3. Ehdotus seuraavaksi tehtäväksi tai priorisointiin
-
 Pidä vastaus lyhyenä ja käytännöllisenä (max 200 sanaa)."""
 
         try:
