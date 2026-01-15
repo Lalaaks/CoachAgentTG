@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from typing import Awaitable, Callable, Dict, Optional
 
 from app.infra.db.repo.scheduled_jobs_sqlite import ScheduledJobsRepo, ScheduledJob
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now_iso() -> str:
@@ -54,9 +57,9 @@ class SchedulerLoop:
         while not self._stop.is_set():
             try:
                 await self._tick()
-            except Exception:
-                # never crash the bot because of scheduler
-                pass
+            except Exception as e:
+                # never crash the bot because of scheduler, but log errors
+                logger.error(f"Scheduler tick error: {e}", exc_info=True)
             await asyncio.sleep(self._cfg.poll_seconds)
 
     async def _tick(self) -> None:
@@ -72,6 +75,7 @@ class SchedulerLoop:
             next_due = self._compute_next_due(job)
             await self._repo.mark_run_ok(job.job_id, next_due, now_iso)
         except Exception as e:
+            logger.error(f"Job execution failed: job_id={job.job_id}, job_type={job.job_type}, error={e}", exc_info=True)
             await self._repo.mark_run_failed(job.job_id, str(e), now_iso)
 
     def _compute_next_due(self, job: ScheduledJob) -> Optional[str]:

@@ -69,31 +69,23 @@ class ScheduledJobsRepo:
         self,
         job_id: str,
         user_id: int,
+        agent_id: str,
         title: str,
         chat_id: int,
+        due_at_iso_utc: str,
         now_iso: str,
-            ) -> None:
+    ) -> None:
         payload = {"title": title, "chat_id": chat_id}
-
-        await self._db.execute(
-            """
-            INSERT INTO scheduled_jobs(
-              job_id, user_id, agent_id,
-              job_type, schedule_kind, schedule_json, payload_json,
-              status, due_at, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', '9999-12-31T23:59:59Z', ?, ?);
-            """,
-            (
-                job_id,
-                user_id,
-                "todo",
-                "todo",
-                "manual",
-                None,
-                json.dumps(payload, ensure_ascii=False),
-                now_iso,
-                now_iso,
-            ),
+        await self.create(
+            job_id=job_id,
+            user_id=user_id,
+            agent_id=agent_id,
+            job_type="todo",
+            schedule_kind="once",
+            schedule={},
+            payload=payload,
+            due_at_iso_utc=due_at_iso_utc,
+            now_iso=now_iso,
         )
 
     async def list_pending_todos(self, user_id: int) -> list[dict[str, Any]]:
@@ -167,33 +159,6 @@ class ScheduledJobsRepo:
         payload = json.loads(row["payload_json"] or "{}")
         v = payload.get("chat_id")
         return int(v) if v is not None else None
-
-    import json
-
-# ... ScheduledJobsRepo class ...
-
-    async def create_todo(
-        self,
-        job_id: str,
-        user_id: int,
-        agent_id: str,
-        title: str,
-        chat_id: int,
-        due_at_iso_utc: str,
-        now_iso: str,
-    ) -> None:
-        payload = {"title": title, "chat_id": chat_id}
-        await self.create(
-            job_id=job_id,
-            user_id=user_id,
-            agent_id=agent_id,
-            job_type="todo",
-            schedule_kind="once",
-            schedule={},
-            payload=payload,
-            due_at_iso_utc=due_at_iso_utc,
-            now_iso=now_iso,
-        )
 
     async def list_pending_todos_for_user(self, user_id: int, limit: int = 5000):
         rows = await self._db.fetchall(

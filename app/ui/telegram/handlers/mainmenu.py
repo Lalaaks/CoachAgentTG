@@ -1,63 +1,46 @@
 from __future__ import annotations
 
 from aiogram import Router, F
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
-from app.infra.db.repo.scheduled_jobs_sqlite import ScheduledJobsRepo
 from app.ui.telegram.keyboards.mainmenu import main_menu_kb
-from app.ui.telegram.keyboards.tasks import tasks_list_kb
-from app.ui.telegram.states.tasks import TasksFlow
 
 router = Router()
 
 
-async def send_mainmenu(message: Message, jobs_repo: ScheduledJobsRepo) -> None:
+async def send_mainmenu(message: Message, text: str = "Menu") -> None:
     """
-    Show main menu and immediately show pending todos if there are any.
+    Yhteinen apufunktio, jota muut handlerit voivat importata:
+    from app.ui.telegram.handlers.mainmenu import send_mainmenu
     """
-    await message.answer("Valitse toiminto.", reply_markup=main_menu_kb())
+    await message.answer(text, reply_markup=main_menu_kb())
 
-    items = await jobs_repo.list_pending_todos(message.from_user.id)
-    if items:
-        await message.answer("Tekemättömät tehtävät:", reply_markup=tasks_list_kb(items))
 
+# --- Main menu button handlers (reply keyboard) ---
 
 @router.message(F.text == "Agentit")
-async def mm_agents(message: Message, state: FSMContext, jobs_repo: ScheduledJobsRepo):
-    await state.clear()
-    await message.answer("Agentit: suunnitteilla.", reply_markup=main_menu_kb())
-    await send_mainmenu(message, jobs_repo=jobs_repo)
-
-
-@router.message(F.text == "Asetukset")
-async def mm_settings(message: Message, state: FSMContext, jobs_repo: ScheduledJobsRepo):
-    await state.clear()
-    await message.answer(
-        "Asetukset: suunnitteilla.\n"
-        "- aikavyöhyke\n"
-        "- muistutukset\n"
-        "- raportointi\n"
-        "- agenttien on/off",
-        reply_markup=main_menu_kb(),
-    )
-    await send_mainmenu(message, jobs_repo=jobs_repo)
+async def menu_agents(message: Message):
+    # placeholder / navigoi agenttimenuun myöhemmin
+    await send_mainmenu(message, "Agenttitoimisto tulossa.")
 
 
 @router.message(F.text == "Tilastot")
-async def mm_stats(message: Message, state: FSMContext, jobs_repo: ScheduledJobsRepo):
-    await state.clear()
-    await message.answer(
-        "Tilastot: suunnitteilla.\n"
-        "- Oppari tunnit\n"
-        "- Todo: tehty/päivä, streak\n"
-        "- agenttikohtaiset yhteenvedot",
-        reply_markup=main_menu_kb(),
-    )
-    await send_mainmenu(message, jobs_repo=jobs_repo)
+async def menu_stats(message: Message):
+    # jos /stats on komento-handler, ohjataan sinne:
+    await message.answer("/stats")
 
 
 @router.message(F.text == "Lisää tehtävä")
-async def mm_add_task(message: Message, state: FSMContext):
-    await state.set_state(TasksFlow.add_title)
-    await message.answer("Kirjoita tehtävän kuvaus (yksi viesti).", reply_markup=main_menu_kb())
+async def menu_add_task(message: Message):
+    # avaa FSM-polun (tai jos haluat suoran, vaihda /td_add <...>)
+    await message.answer("/td_add")
+
+
+@router.message(F.text == "Tehtävät")
+async def menu_tasks(message: Message):
+    await message.answer("/td")
+
+
+@router.message(F.text == "Asetukset")
+async def menu_settings(message: Message):
+    await send_mainmenu(message, "Asetukset tulossa.")
